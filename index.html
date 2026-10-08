@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FilsBox — Mes fichiers</title>
+<style>
+:root{
+  --bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#718096;
+  --primary:#5b5cf0;--primary2:#7c3aed;--border:#e7eaf2;
+  --danger:#ef4444;--shadow:0 12px 35px rgba(20,30,60,.08)
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+button,input,textarea{font:inherit}
+button{cursor:pointer;border:0}
+.app{display:flex;min-height:100vh}
+.sidebar{width:250px;background:var(--card);border-right:1px solid var(--border);padding:22px 16px;position:fixed;inset:0 auto 0 0;z-index:5}
+.logo{font-size:23px;font-weight:800;padding:8px 12px 25px}.logo span{color:var(--primary)}
+.nav button{width:100%;text-align:left;background:transparent;padding:12px 14px;border-radius:12px;margin:3px 0;color:var(--text)}
+.nav button:hover,.nav button.active{background:#eef0ff;color:var(--primary);font-weight:700}
+.sidebar-bottom{position:absolute;bottom:18px;left:16px;right:16px}
+.main{margin-left:250px;width:calc(100% - 250px);padding:28px;max-width:1500px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px}
+h1{margin:0;font-size:30px}.sub{color:var(--muted);margin-top:5px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{padding:11px 16px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-weight:650}
+.btn.primary{background:var(--primary);color:white;border-color:var(--primary)}
+.btn.danger{color:var(--danger)}
+.search{background:var(--card);border:1px solid var(--border);padding:13px 16px;border-radius:13px;width:100%;outline:none}
+.search:focus{border-color:var(--primary)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.folder{transition:.2s}.folder:hover{transform:translateY(-2px);border-color:#cfd2ff}
+.folder-icon{font-size:38px}.folder h3{margin:12px 0 5px}.muted{color:var(--muted);font-size:14px}
+.file{display:flex;align-items:center;gap:13px}.file-icon{width:48px;height:48px;border-radius:13px;background:#f0f2ff;display:grid;place-items:center;font-size:24px}
+.file-info{min-width:0;flex:1}.file-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-actions{display:flex;gap:5px}.iconbtn{background:transparent;padding:7px;border-radius:8px}.iconbtn:hover{background:#f0f1f6}
+.empty{text-align:center;padding:55px 20px;color:var(--muted);grid-column:1/-1}
+.modal{position:fixed;inset:0;background:rgba(10,15,30,.48);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+.modal.show{display:flex}.modal-box{background:var(--card);border-radius:20px;padding:25px;width:min(500px,100%);box-shadow:0 30px 80px #0003}
+.modal h2{margin-top:0}.field{margin:13px 0}.field label{display:block;font-weight:650;margin-bottom:7px}
+.field input,.field textarea{width:100%;padding:12px;border:1px solid var(--border);border-radius:11px;outline:none;background:var(--card);color:var(--text)}
+.field textarea{min-height:130px;resize:vertical}.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+.auth{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;padding:20px;z-index:50}
+.auth-box{width:min(430px,100%);background:var(--card);border:1px solid var(--border);border-radius:24px;padding:30px;box-shadow:var(--shadow)}
+.auth h1{margin-bottom:5px}.tabs{display:flex;background:#f0f2f7;padding:4px;border-radius:12px;margin:20px 0}.tabs button{flex:1;padding:10px;border-radius:9px;background:transparent}.tabs button.active{background:white;box-shadow:0 2px 8px #0001;font-weight:700}
+.status{font-size:13px;color:var(--muted);margin-top:10px}
+.toast{position:fixed;right:20px;bottom:20px;background:#171b2b;color:white;padding:13px 17px;border-radius:12px;display:none;z-index:100}
+.mobile-menu{display:none}
+@media(max-width:800px){
+ .sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}
+ .main{margin-left:0;width:100%;padding:20px}.mobile-menu{display:block}
+ .top{align-items:flex-start}.top h1{font-size:25px}
+}
+
+.zoomable-image{
+  max-width:100%;
+  max-height:65vh;
+  display:block;
+  margin:auto;
+  border-radius:12px;
+  cursor:zoom-in;
+  transition:transform .15s ease;
+  user-select:none;
+}
+.zoomable-image.zoomed{
+  max-width:none;
+  max-height:none;
+  width:auto;
+  height:auto;
+  cursor:zoom-out;
+  transform-origin:center center;
+}
+</style>
+</head>
+<body>
+
+<div id="auth" class="auth">
+  <div class="auth-box">
+    <div class="logo">Fils<span>Box</span></div>
+    <h1 id="authTitle">Bienvenue 👋</h1>
+    <div class="sub">Tes fichiers, organisés partout.</div>
+    <div class="tabs">
+      <button id="loginTab" class="active" onclick="setAuthMode('login')">Connexion</button>
+      <button id="signupTab" onclick="setAuthMode('signup')">Créer un compte</button>
+    </div>
+    <div class="field"><label>Pseudo</label><input id="username" type="text" placeholder="Ton pseudo" autocomplete="username"></div>
+    <div class="field"><label>Mot de passe</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn primary" style="width:100%" onclick="submitAuth()" id="authBtn">Se connecter</button>
+    <div class="status" id="authStatus">Crée un compte avec ton pseudo et ton mot de passe pour commencer.</div>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">Fils<span>Box</span></div>
+    <div class="nav">
+      <button class="active" onclick="showSection('home',this)">🏠 Accueil</button>
+      <button onclick="showSection('files',this)">📁 Tous les fichiers</button>
+      <button onclick="showSection('favorites',this)">⭐ Favoris</button>
+      
+    </div>
+    <div class="sidebar-bottom">
+      <button class="btn" style="width:100%" onclick="toggleTheme()">🌙 Apparence</button>
+      <button class="btn danger" style="width:100%;margin-top:8px" onclick="logout()">↪ Déconnexion</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div>
+        <button class="btn mobile-menu" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 id="title">Mes fichiers</h1>
+        <div class="sub" id="userText">Synchronisation activée</div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="openModal('categoryModal')">＋ Catégorie</button>
+        <button class="btn" onclick="openNoteModal()">📝 Note</button>
+        <button class="btn primary" onclick="document.getElementById('fileInput').click()">＋ Ajouter</button>
+        <input id="fileInput" type="file" multiple hidden onchange="addFiles(this.files)">
+      </div>
+    </div>
+
+    <input class="search" id="search" placeholder="🔎 Rechercher un fichier ou une catégorie..." oninput="render()">
+
+    <section>
+      <h2>Catégories</h2>
+      <div class="grid" id="categories"></div>
+    </section>
+
+    <section style="margin-top:30px">
+      <div class="grid" id="files"></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="categoryModal">
+  <div class="modal-box">
+    <h2>Nouvelle catégorie</h2>
+    <div class="field"><label>Nom</label><input id="categoryName" placeholder="Ex : Cours, Photos, Projets..."></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('categoryModal')">Annuler</button>
+      <button class="btn primary" onclick="createCategory()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="noteModal">
+  <div class="modal-box">
+    <h2>Nouvelle note</h2>
+    <div class="field"><label>Titre</label><input id="noteTitle" placeholder="Titre de la note"></div>
+    <div class="field"><label>Texte</label><textarea id="noteText" placeholder="Écris ton texte ici..."></textarea></div><div class="field"><label>Catégorie</label><select id="noteCategory" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--card);color:var(--text)"></select></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('noteModal')">Annuler</button>
+      <button class="btn primary" onclick="createNote()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="fileCategoryModal">
+  <div class="modal-box">
+    <h2>Ajouter le fichier</h2>
+    <div class="sub" id="selectedFileNames"></div>
+    <div class="field">
+      <label>Catégorie</label>
+      <select id="fileCategory" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--card);color:var(--text)"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cancelFileAdd()">Annuler</button>
+      <button class="btn primary" onclick="confirmFileAdd()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="viewerModal">
+  <div class="modal-box" style="width:min(900px,100%);max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 id="viewerTitle">Aperçu</h2>
+      <button class="iconbtn" onclick="closeModal('viewerModal')">✕</button>
+    </div>
+    <div id="viewerContent" style="margin-top:15px"></div>
+  </div>
+</div>
+
+<div class="modal" id="folderModal">
+  <div class="modal-box" style="width:min(1000px,100%);max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h2 id="folderTitle">Dossier</h2>
+        <div class="sub" id="folderSubtitle"></div>
+      </div>
+      <button class="iconbtn" onclick="closeModal('folderModal')">✕</button>
+    </div>
+    <div class="grid" id="folderFiles" style="margin-top:18px"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase : remplace les valeurs ci-dessous par celles de TON projet Firebase -->
+<script>
+const AUTH_KEY = "filsbox_accounts";
+const SESSION_KEY = "filsbox_session";
+
+let currentUser = null;
+let authMode = "login";
+let categories = [];
+let files = [];
+
+function getAccounts(){ return JSON.parse(localStorage.getItem(AUTH_KEY) || "{}"); }
+function saveAccounts(accounts){ localStorage.setItem(AUTH_KEY, JSON.stringify(accounts)); }
+
+function userDataKey(type){
+  return "filsbox_" + type + "_" + (currentUser?.username || "");
+}
+
+function loadUserData(username){
+  currentUser = { username };
+  categories = JSON.parse(localStorage.getItem("filsbox_categories_" + username) || "[]");
+  files = JSON.parse(localStorage.getItem("filsbox_files_" + username) || "[]");
+}
+
+function clearLegacySharedData(){
+  localStorage.removeItem("filsbox_categories");
+  localStorage.removeItem("filsbox_files");
+}
+function showAppForUser(username){
+  loadUserData(username);
+  document.getElementById("auth").style.display = "none";
+  document.getElementById("userText").textContent = "👤 Connecté en tant que " + username;
+  render();
+}
+
+function checkSession(){
+  const username = localStorage.getItem(SESSION_KEY);
+  if(username && getAccounts()[username]) showAppForUser(username);
+  else document.getElementById("auth").style.display = "grid";
+}
+
+window.setAuthMode = mode => {
+  authMode = mode;
+  document.getElementById("loginTab").classList.toggle("active", mode === "login");
+  document.getElementById("signupTab").classList.toggle("active", mode === "signup");
+  document.getElementById("authBtn").textContent = mode === "login" ? "Se connecter" : "Créer mon compte";
+  document.getElementById("authTitle").textContent = mode === "login" ? "Bienvenue 👋" : "Créer ton compte";
+  document.getElementById("authStatus").textContent =
+    mode === "login"
+      ? "Entre ton pseudo et ton mot de passe pour continuer."
+      : "Choisis un pseudo et un mot de passe d'au moins 6 caractères.";
+};
+
+window.submitAuth = () => {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+
+  if(!username || username.length < 3){ toast("Le pseudo doit contenir au moins 3 caractères."); return; }
+  if(password.length < 6){ toast("Le mot de passe doit contenir au moins 6 caractères."); return; }
+
+  const accounts = getAccounts();
+
+  if(authMode === "signup"){
+    if(accounts[username]){ toast("Ce pseudo existe déjà."); return; }
+    accounts[username] = { password };
+    saveAccounts(accounts);
+    localStorage.setItem(SESSION_KEY, username);
+    document.getElementById("password").value = "";
+    showAppForUser(username);
+    toast("Compte créé avec succès 🎉");
+  }else{
+    if(!accounts[username] || accounts[username].password !== password){
+      toast("Pseudo ou mot de passe incorrect.");
+      return;
+    }
+    localStorage.setItem(SESSION_KEY, username);
+    document.getElementById("password").value = "";
+    showAppForUser(username);
+    toast("Connexion réussie 👋");
+  }
+};
+
+window.logout = () => {
+  localStorage.removeItem(SESSION_KEY);
+  currentUser = null;
+  document.getElementById("auth").style.display = "grid";
+  document.getElementById("username").value = "";
+  document.getElementById("password").value = "";
+  setAuthMode("login");
+};
+
+window.openModal=id=>document.getElementById(id).classList.add("show");
+window.closeModal=id=>document.getElementById(id).classList.remove("show");
+
+window.createCategory = async()=>{
+  const name=document.getElementById("categoryName").value.trim();
+  if(!name)return;
+  const item={id:crypto.randomUUID(),name,createdAt:Date.now(),userId:currentUser?.username||"local"};
+  categories.push(item); saveLocal();
+  document.getElementById("categoryName").value="";
+  closeModal("categoryModal"); render(); toast("Catégorie créée");
+};
+
+window.addFiles = async fileList=>{
+  const arr=[...fileList]; if(!arr.length)return;
+  window.pendingFiles=arr;
+  const select=document.getElementById("fileCategory");
+  select.innerHTML='<option value="">📂 Sans catégorie</option>'+
+    categories.map(c=>`<option value="${escAttr(c.id)}">📁 ${esc(c.name)}</option>`).join("");
+  document.getElementById("selectedFileNames").textContent =
+    arr.length===1 ? arr[0].name : `${arr.length} fichiers sélectionnés`;
+  openModal("fileCategoryModal");
+  document.getElementById("fileInput").value="";
+};
+
+window.cancelFileAdd=()=>{window.pendingFiles=[];closeModal("fileCategoryModal");};
+
+window.confirmFileAdd=async()=>{
+  const arr=window.pendingFiles||[];
+  const categoryId=document.getElementById("fileCategory").value||null;
+  for(const f of arr){
+    const item={id:crypto.randomUUID(),name:f.name,size:f.size,type:f.type||"file",
+      createdAt:Date.now(),userId:currentUser?.username||"local",favorite:false,categoryId};
+    if(f.type?.includes("image")||f.type?.includes("pdf")||f.type?.includes("text"))
+      item.dataUrl=await fileToDataURL(f);
+    if(f.type?.includes("text")) item.text=await f.text();
+    files.unshift(item);
+  }
+  saveLocal(); render(); closeModal("fileCategoryModal"); window.pendingFiles=[];
+  toast(arr.length+" fichier(s) ajouté(s)");
+};
+
+window.openNoteModal=()=>{
+  const select=document.getElementById("noteCategory");
+  select.innerHTML='<option value="">📂 Sans catégorie</option>'+
+    categories.map(c=>`<option value="${escAttr(c.id)}">📁 ${esc(c.name)}</option>`).join("");
+  openModal("noteModal");
+};
+
+window.createNote=async()=>{
+  const title=document.getElementById("noteTitle").value.trim();
+  const text=document.getElementById("noteText").value;
+  const categoryId=document.getElementById("noteCategory").value||null;
+  if(!title)return;
+  files.unshift({id:crypto.randomUUID(),name:title+".txt",type:"text/plain",text,
+    createdAt:Date.now(),userId:currentUser?.username||"local",favorite:false,categoryId});
+  saveLocal();
+  document.getElementById("noteTitle").value="";
+  document.getElementById("noteText").value="";
+  closeModal("noteModal"); render(); toast("Note enregistrée");
+};
+
+window.openFolder=id=>{
+  const c=categories.find(x=>x.id===id); if(!c)return;
+  const folderFiles=files.filter(f=>f.categoryId===id);
+  document.getElementById("folderTitle").textContent="📁 "+c.name;
+  document.getElementById("folderSubtitle").textContent=folderFiles.length+(folderFiles.length>1?" fichiers":" fichier");
+  document.getElementById("folderFiles").innerHTML=folderFiles.map(f=>`
+    <div class="card file" ondblclick="openFile('${f.id}')" title="Double-clique pour ouvrir">
+      <div class="file-icon">${fileIcon(f.type,f.name)}</div>
+      <div class="file-info"><div class="file-name">${esc(f.name)}</div><div class="muted">${formatSize(f.size||0)}</div></div>
+      <div class="file-actions">
+        <button class="iconbtn" title="Favori" onclick="toggleFavorite('${f.id}')">${f.favorite?"⭐":"☆"}</button>
+        <button class="iconbtn" title="Supprimer" onclick="deleteFile('${f.id}')">🗑️</button>
+      </div>
+    </div>`).join("")||`<div class="empty">Ce dossier est vide.</div>`;
+  openModal("folderModal");
+};
+
+window.openFile=async id=>{
+  const f=files.find(x=>x.id===id); if(!f)return;
+  document.getElementById("viewerTitle").textContent=f.name;
+  const v=document.getElementById("viewerContent");
+  if(f.type?.includes("image")&&f.dataUrl)
+    v.innerHTML=`<div style="overflow:auto;max-height:70vh;text-align:center"><img src="${f.dataUrl}" class="zoomable-image" onclick="this.classList.toggle('zoomed')" title="Clique pour zoomer / dézoomer"></div><div class="muted" style="text-align:center;margin-top:10px">🔍 Clique sur l’image pour zoomer / dézoomer • utilise la molette pour faire défiler</div>`;
+  else if((f.type?.includes("pdf")||f.name.toLowerCase().endsWith(".pdf"))&&f.dataUrl)
+    v.innerHTML=`<iframe src="${f.dataUrl}" style="width:100%;height:65vh;border:0;border-radius:12px"></iframe>`;
+  else if(f.type?.includes("text"))
+    v.innerHTML=`<pre style="white-space:pre-wrap;line-height:1.6;background:var(--bg);padding:18px;border-radius:12px">${esc(f.text||"")}</pre>`;
+  else v.innerHTML='<div class="empty">Aperçu indisponible pour ce fichier.</div>';
+  openModal("viewerModal");
+};
+
+window.deleteFile=async id=>{files=files.filter(x=>x.id!==id);saveLocal();render();toast("Fichier supprimé");};
+window.deleteCategory=async id=>{categories=categories.filter(x=>x.id!==id);saveLocal();render();toast("Catégorie supprimée");};
+window.toggleFavorite=async id=>{const f=files.find(x=>x.id===id);if(!f)return;f.favorite=!f.favorite;saveLocal();render();};
+
+window.showSection=(section,btn)=>{
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("title").textContent=section==="favorites"?"Mes favoris":section==="files"?"Tous mes fichiers":"Mes fichiers";
+  render(section); document.getElementById("sidebar").classList.remove("open");
+};
+
+let currentSection="home";
+function render(section=currentSection){
+  currentSection=section;
+  const q=document.getElementById("search").value.toLowerCase();
+  let cats=categories.filter(c=>c.name.toLowerCase().includes(q));
+  let fs=files.filter(f=>(f.name||"").toLowerCase().includes(q));
+  if(section==="favorites")fs=fs.filter(f=>f.favorite);
+  document.getElementById("categories").innerHTML=cats.map(c=>`
+    <div class="card folder" ondblclick="openFolder('${c.id}')" title="Double-clique pour ouvrir">
+      <div class="folder-icon">📁</div><h3>${esc(c.name)}</h3>
+      <div class="muted">${files.filter(f=>f.categoryId===c.id).length} fichier(s)</div>
+      <button class="iconbtn" onclick="event.stopPropagation();deleteCategory('${c.id}')">🗑️ Supprimer</button>
+    </div>`).join("")||`<div class="empty">Aucune catégorie. Crée ta première catégorie.</div>`;
+  document.getElementById("files").innerHTML=fs.map(f=>`
+    <div class="card file" ondblclick="openFile('${f.id}')" title="Double-clique pour ouvrir">
+      <div class="file-icon">${fileIcon(f.type,f.name)}</div>
+      <div class="file-info"><div class="file-name">${esc(f.name)}</div><div class="muted">${formatSize(f.size||0)}${f.categoryId?" · 📁 "+esc((categories.find(c=>c.id===f.categoryId)||{}).name||"Catégorie"):""}</div></div>
+      <div class="file-actions">
+        <button class="iconbtn" title="Favori" onclick="toggleFavorite('${f.id}')">${f.favorite?"⭐":"☆"}</button>
+        <button class="iconbtn" title="Supprimer" onclick="deleteFile('${f.id}')">🗑️</button>
+      </div>
+    </div>`).join("")||`<div class="empty">Aucun fichier ici.</div>`;
+}
+window.render=render;
+
+function fileToDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
+function escAttr(s){return String(s).replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
+function saveLocal(){
+  if(!currentUser?.username) return;
+  localStorage.setItem(userDataKey("categories"),JSON.stringify(categories));
+  localStorage.setItem(userDataKey("files"),JSON.stringify(files));
+}
+function fileIcon(type,name){if(type?.includes("image"))return"🖼️";if(type?.includes("pdf")||name?.toLowerCase().endsWith(".pdf"))return"📕";if(type?.includes("text"))return"📝";return"📄";}
+function formatSize(n){if(!n)return"Fichier";let u=["o","Ko","Mo","Go"],i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+" "+u[i];}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+window.toggleTheme=()=>{document.body.classList.toggle("dark");document.body.style.setProperty("--bg",document.body.classList.contains("dark")?"#0d111c":"#f5f7fb");document.body.style.setProperty("--card",document.body.classList.contains("dark")?"#151b29":"#fff");document.body.style.setProperty("--text",document.body.classList.contains("dark")?"#f4f6fb":"#172033");document.body.style.setProperty("--border",document.body.classList.contains("dark")?"#273047":"#e7eaf2");};
+function toast(t){const x=document.getElementById("toast");x.textContent=t;x.style.display="block";setTimeout(()=>x.style.display="none",2500);}
+
+clearLegacySharedData();
+checkSession();
+render();
+</script>
+</body>
+</html>
